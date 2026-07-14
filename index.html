@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SIBINA Rangkasbitung - Sistem Manajemen Narapidana & Jadwal Pembinaan</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        primary: '#1e40af', // Blue-800
+                        secondary: '#475569', // Slate-600
+                        accent: '#f59e0b', // Amber-500
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
+        .tab-active { border-bottom-color: #1e40af; color: #1e40af; }
+        
+        /* Calendar Styles */
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 1px;
+            background-color: #e2e8f0;
+            border: 1px solid #e2e8f0;
+        }
+        .calendar-day-header {
+            background-color: #f8fafc;
+            text-align: center;
+            font-weight: 600;
+            padding: 0.5rem;
+            font-size: 0.875rem;
+            color: #475569;
+        }
+        .calendar-day {
+            background-color: white;
+            min-height: 100px;
+            padding: 0.5rem;
+            position: relative;
+        }
+        .calendar-day.empty { background-color: #f8fafc; }
+        .calendar-day.today { background-color: #eff6ff; }
+        .date-number { font-weight: 600; font-size: 0.875rem; color: #64748b; margin-bottom: 0.25rem; display: block; }
+        .calendar-day.today .date-number { color: #1e40af; }
+        
+        .event-badge {
+            font-size: 0.7rem;
+            padding: 0.15rem 0.3rem;
+            border-radius: 0.25rem;
+            margin-bottom: 0.15rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        .event-badge:hover { opacity: 0.8; }
+        
+        /* Modal Styles */
+        .modal { display: none; }
+        .modal.active { display: flex; }
+        
+        /* Custom Scrollbar for lists */
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="text-slate-800 h-screen flex flex-col">
+
+    <nav class="bg-primary text-white shadow-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center">
+                    <i class="fas fa-shield-alt text-2xl mr-3"></i>
+                    <span class="font-bold text-xl tracking-tight">SIBINA Rangkasbitung</span>
+                </div>
+                <div class="hidden md:block">
+                    <div class="ml-10 flex items-baseline space-x-4">
+                        <span class="text-white px-3 py-2 rounded-md text-sm font-medium">Sistem Informasi Pembinaan Narapidana Rangkasbitung</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="flex-grow flex flex-col md:flex-row overflow-hidden max-w-7xl mx-auto w-full">
+        
+        <!-- Sidebar Navigation -->
+        <div class="w-full md:w-64 bg-white shadow-md z-10 flex-shrink-0 flex md:flex-col overflow-x-auto md:overflow-visible">
+            <button onclick="switchTab('input')" id="tab-btn-input" class="flex-1 md:w-full flex items-center p-4 hover:bg-slate-50 transition-colors border-b-2 md:border-b-0 md:border-l-4 border-primary text-primary bg-slate-50 font-medium whitespace-nowrap">
+                <i class="fas fa-user-plus w-6 text-center mr-2"></i> Data & Kasus
+            </button>
+            <button onclick="switchTab('list')" id="tab-btn-list" class="flex-1 md:w-full flex items-center p-4 hover:bg-slate-50 transition-colors border-b-2 md:border-b-0 md:border-l-4 border-transparent text-slate-600 whitespace-nowrap">
+                <i class="fas fa-users w-6 text-center mr-2"></i> Daftar WBP
+            </button>
+            <button onclick="switchTab('activities')" id="tab-btn-activities" class="flex-1 md:w-full flex items-center p-4 hover:bg-slate-50 transition-colors border-b-2 md:border-b-0 md:border-l-4 border-transparent text-slate-600 whitespace-nowrap">
+                <i class="fas fa-tasks w-6 text-center mr-2"></i> Master Kegiatan
+            </button>
+            <button onclick="switchTab('calendar')" id="tab-btn-calendar" class="flex-1 md:w-full flex items-center p-4 hover:bg-slate-50 transition-colors border-b-2 md:border-b-0 md:border-l-4 border-transparent text-slate-600 whitespace-nowrap">
+                <i class="fas fa-calendar-alt w-6 text-center mr-2"></i> Jadwal Kegiatan
+            </button>
+        </div>
+
+        <!-- Main Content Area -->
+        <main class="flex-grow overflow-y-auto p-4 md:p-6 bg-slate-100 custom-scrollbar relative">
+            
+            <!-- Toast Notification -->
+            <div id="toast" class="fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded shadow-lg transform transition-transform duration-300 translate-y-[-150%] z-50 flex items-center">
+                <i class="fas fa-check-circle mr-2"></i>
+                <span id="toast-message">Berhasil!</span>
+            </div>
+
+            <!-- SECTION 1: Input Data -->
+            <div id="section-input" class="section-content block max-w-4xl mx-auto">
+                <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden mb-6">
+                    <div class="bg-slate-50 border-b border-slate-200 px-6 py-4">
+                        <h2 class="text-lg font-semibold text-slate-800"><i class="fas fa-file-signature text-primary mr-2"></i>Formulir Pendaftaran Narapidana / WBP</h2>
+                        <p class="text-sm text-slate-500 mt-1">Input data biografi dan jenis kasus untuk menentukan program pembinaan.</p>
+                    </div>
+                    
+                    <form id="inmateForm" class="p-6">
+                        <!-- Biografi Section -->
+                        <h3 class="font-medium text-slate-700 mb-4 pb-2 border-b">1. Biografi</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Nomor Registrasi (Otomatis)</label>
+                                <input type="text" id="regNumber" class="w-full border border-slate-300 rounded-md p-2 bg-slate-100 text-slate-500 cursor-not-allowed" readonly>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Nama Lengkap <span class="text-red-500">*</span></label>
+                                <input type="text" id="fullName" required class="w-full border border-slate-300 rounded-md p-2 focus:ring-primary focus:border-primary">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Tempat Lahir <span class="text-red-500">*</span></label>
+                                <input type="text" id="birthPlace" required class="w-full border border-slate-300 rounded-md p-2 focus:ring-primary focus:border-primary">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Tanggal Lahir <span class="text-red-500">*</span></label>
+                                <input type="date" id="birthDate" required class="w-full border border-slate-300 rounded-md p-2 focus:ring-primary focus:border-primary">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Jenis Kelamin <span class="text-red-500">*</span></label>
+                                <select id="gender" required class="w-full border border-slate-300 rounded-md p-2 focus:ring-primary focus:border-primary">
+                                    <option value="">Pilih...</option>
+                                    <option value="Laki-laki">Laki-laki</option>
+                                    <option value="Perempuan">Perempuan</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Agama <span class="text-red-500">*</span></label>
+                                <select id="religion" required class="w-full border border-slate-300 rounded-md p-2 focus:ring-primary focus:border-primary">
+                                    <option value="">Pilih...</option>
+                                    <option value="Islam">Islam</option>
+                                    <option value="Kristen Protestan">Kristen Protestan</option>
+                                    <option value="Katolik">Katolik</option>
+                                    <option value="Hindu">Hindu</option>
+                                    <option value="Buddha">Buddha</option>
+                                    <option value="Konghucu">Konghucu</option>
+                                </select>
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Alamat Lengkap</label>
+                                <textarea id="address" rows="2" class="w-full border border-slate-300 rounded-md p-2 focus:ring-primary focus:border-primary"></textarea>
+                            </div>
+                        </div>
+
+                        <!-- Kasus Section -->
+                        <h3 class="font-medium text-slate-700 mb-4 pb-2 border-b">2. Informasi Kasus & Pidana</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Jenis Kasus Utama <span class="text-red-500">*</span></label>
+                                <select id="caseType" required onchange="suggestActivities()" class="w-full border border-slate-300 rounded-md p-2 focus:ring-primary focus:border-primary bg-blue-50">
+                                    <option value="">-- Pilih Jenis Kasus --</option>
+                                    <option value="Semua">Semua Kasus (Umum)</option>
+                                    <option value="Narkotika">Narkotika / Obat Terlarang</option>
+                                    <option value="Pencurian">Pencurian / Perampokan</option>
+                                    <option value="Korupsi">Tindak Pidana Korupsi</option>
+                                    <option value="Kekerasan">Kekerasan / Penganiayaan</option>
+                                    <option value="Penipuan">Penipuan / Penggelapan</option>
+                                    <option value="Lainnya">Tindak Pidana Lainnya</option>
+                                </select>
+                                <p class="text-xs text-slate-500 mt-1">Sistem akan menyarankan jadwal pembinaan berdasarkan kasus.</p>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Lama Pidana (Vonis)</label>
+                                <div class="flex space-x-2">
+                                    <input type="number" id="sentenceYears" placeholder="Tahun" class="w-1/2 border border-slate-300 rounded-md p-2 focus:ring-primary focus:border-primary">
+                                    <input type="number" id="sentenceMonths" placeholder="Bulan" class="w-1/2 border border-slate-300 rounded-md p-2 focus:ring-primary focus:border-primary">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Suggested Activities Section (Dynamic) -->
+                        <div id="activitySuggestionBox" class="hidden bg-blue-50 border border-blue-200 rounded-md p-4 mb-6">
+                            <h4 class="text-sm font-semibold text-primary mb-2"><i class="fas fa-lightbulb text-accent mr-1"></i> Rekomendasi Program Pembinaan</h4>
+                            <p class="text-xs text-slate-600 mb-3">Berdasarkan kasus <strong id="displayCaseType"></strong>, berikut kegiatan yang wajib diikuti:</p>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3" id="suggestedActivitiesList">
+                                <!-- Checkboxes populated via JS -->
+                            </div>
+                            
+                            <div class="mt-4 pt-3 border-t border-blue-200">
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Jadwalkan Mulai Tanggal:</label>
+                                <input type="date" id="activityStartDate" class="border border-slate-300 rounded-md p-2 w-full md:w-auto">
+                            </div>
+                        </div>
+
+                        <div class="flex justify-end pt-4 border-t border-slate-200 mt-6">
+                            <button type="button" onclick="document.getElementById('inmateForm').reset(); document.getElementById('activitySuggestionBox').classList.add('hidden'); generateRegNumber();" class="mr-3 px-4 py-2 border border-slate-300 rounded-md text-slate-700 bg-white hover:bg-slate-50">Reset</button>
+                            <button type="submit" class="px-6 py-2 bg-primary text-white rounded-md hover:bg-blue-700 shadow-sm font-medium">Simpan & Jadwalkan</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- SECTION 2: Daftar WBP -->
+            <div id="section-list" class="section-content hidden">
+                <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="bg-slate-50 border-b border-slate-200 px-6 py-4 flex justify-between items-center">
+                        <h2 class="text-lg font-semibold text-slate-800"><i class="fas fa-list text-primary mr-2"></i>Daftar Warga Binaan Pemasyarakatan</h2>
+                        <div class="relative">
+                            <input type="text" id="searchInput" onkeyup="filterInmates()" placeholder="Cari nama/reg..." class="border border-slate-300 rounded-full pl-10 pr-4 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary w-64">
+                            <i class="fas fa-search absolute left-3 top-2.5 text-slate-400 text-sm"></i>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">No. Reg</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama & Biografi</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kasus</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kegiatan Aktif</th>
+                                    <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="inmateTableBody" class="bg-white divide-y divide-gray-200">
+                                <!-- Data populated via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="emptyListState" class="hidden py-10 text-center text-slate-500">
+                        <i class="fas fa-folder-open text-4xl mb-3 text-slate-300"></i>
+                        <p>Belum ada data narapidana.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 3: Kalender Kegiatan -->
+            <div id="section-calendar" class="section-content hidden h-full flex flex-col">
+                <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden flex-grow flex flex-col">
+                    
+                    <div class="bg-slate-50 border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+                        <h2 class="text-lg font-semibold text-slate-800 flex items-center">
+                            <i class="fas fa-calendar-check text-primary mr-2"></i>
+                            Jadwal Pembinaan WBP
+                        </h2>
+                        
+                        <div class="flex items-center space-x-4">
+                            <button onclick="changeMonth(-1)" class="p-2 text-slate-500 hover:text-primary hover:bg-slate-100 rounded-full">
+                                <i class="fas fa-chevron-left"></i>
+                            </button>
+                            <h3 id="currentMonthYear" class="text-md font-bold min-w-[150px] text-center uppercase tracking-wide">Bulan Tahun</h3>
+                            <button onclick="changeMonth(1)" class="p-2 text-slate-500 hover:text-primary hover:bg-slate-100 rounded-full">
+                                <i class="fas fa-chevron-right"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="flex space-x-2 text-xs">
+                            <span class="px-2 py-1 bg-green-100 text-green-800 rounded">Kepribadian</span>
+                            <span class="px-2 py-1 bg-blue-100 text-blue-800 rounded">Kemandirian</span>
+                            <span class="px-2 py-1 bg-purple-100 text-purple-800 rounded">Rehabilitasi</span>
+                        </div>
+                    </div>
+
+                    <!-- Calendar Grid -->
+                    <div class="flex-grow p-4 overflow-y-auto">
+                        <div class="calendar-grid rounded-lg overflow-hidden border border-slate-200">
+                            <!-- Days Header -->
+                            <div class="calendar-day-header text-red-500">Minggu</div>
+                            <div class="calendar-day-header">Senin</div>
+                            <div class="calendar-day-header">Selasa</div>
+                            <div class="calendar-day-header">Rabu</div>
+                            <div class="calendar-day-header">Kamis</div>
+                            <div class="calendar-day-header">Jumat</div>
+                            <div class="calendar-day-header text-red-500">Sabtu</div>
+                            
+                            <!-- Calendar Cells populated by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 4: Master Kegiatan -->
+            <div id="section-activities" class="section-content hidden max-w-5xl mx-auto h-full flex flex-col">
+                <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden mb-6">
+                    <div class="bg-slate-50 border-b border-slate-200 px-6 py-4">
+                        <h2 class="text-lg font-semibold text-slate-800"><i class="fas fa-plus-circle text-primary mr-2"></i>Tambah Jadwal Kegiatan Pembinaan Baru</h2>
+                        <p class="text-sm text-slate-500 mt-1">Buat jadwal kegiatan dengan menentukan hari, jam, frekuensi, dan pembimbing.</p>
+                    </div>
+                    <form id="activityForm" class="p-6">
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Nama Kegiatan <span class="text-red-500">*</span></label>
+                                <input type="text" id="actName" required class="w-full border border-slate-300 rounded-md p-2 focus:ring-primary focus:border-primary">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Kategori Pembinaan <span class="text-red-500">*</span></label>
+                                <select id="actType" required class="w-full border border-slate-300 rounded-md p-2 focus:ring-primary focus:border-primary">
+                                    <option value="Kepribadian">Kepribadian</option>
+                                    <option value="Kemandirian">Kemandirian</option>
+                                    <option value="Rehabilitasi">Rehabilitasi</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Target Kasus <span class="text-red-500">*</span></label>
+                                <select id="actTarget" required class="w-full border border-slate-300 rounded-md p-2 focus:ring-primary focus:border-primary">
+                                    <option value="Semua">Semua Kasus (Umum)</option>
+                                    <option value="Narkotika">Narkotika</option>
+                                    <option value="Pencurian">Pencurian</option>
+                                    <option value="Korupsi">Korupsi</option>
+                                    <option value="Kekerasan">Kekerasan</option>
+                                    <option value="Penipuan">Penipuan</option>
+                                    <option value="Lainnya">Lainnya</option>
+                                </select>
+                            </div>
+                            <div class="lg:col-span-3">
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Jadwal Hari (Ceklis hari untuk frekuensi mingguan) <span class="text-red-500">*</span></label>
+                                <div class="flex flex-wrap gap-4 bg-slate-50 p-3 rounded-md border border-slate-200">
+                                    <label class="inline-flex items-center cursor-pointer"><input type="checkbox" name="actDays" value="1" class="rounded text-primary focus:ring-primary h-4 w-4"> <span class="ml-2 text-sm">Senin</span></label>
+                                    <label class="inline-flex items-center cursor-pointer"><input type="checkbox" name="actDays" value="2" class="rounded text-primary focus:ring-primary h-4 w-4"> <span class="ml-2 text-sm">Selasa</span></label>
+                                    <label class="inline-flex items-center cursor-pointer"><input type="checkbox" name="actDays" value="3" class="rounded text-primary focus:ring-primary h-4 w-4"> <span class="ml-2 text-sm">Rabu</span></label>
+                                    <label class="inline-flex items-center cursor-pointer"><input type="checkbox" name="actDays" value="4" class="rounded text-primary focus:ring-primary h-4 w-4"> <span class="ml-2 text-sm">Kamis</span></label>
+                                    <label class="inline-flex items-center cursor-pointer"><input type="checkbox" name="actDays" value="5" class="rounded text-primary focus:ring-primary h-4 w-4"> <span class="ml-2 text-sm">Jumat</span></label>
+                                    <label class="inline-flex items-center cursor-pointer"><input type="checkbox" name="actDays" value="6" class="rounded text-primary focus:ring-primary h-4 w-4"> <span class="ml-2 text-sm">Sabtu</span></label>
+                                    <label class="inline-flex items-center cursor-pointer"><input type="checkbox" name="actDays" value="0" class="rounded text-primary focus:ring-primary h-4 w-4"> <span class="ml-2 text-sm text-red-600">Minggu</span></label>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Jam Mulai <span class="text-red-500">*</span></label>
+                                <input type="time" id="actStartTime" required class="w-full border border-slate-300 rounded-md p-2 focus:ring-primary focus:border-primary">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Jam Selesai <span class="text-red-500">*</span></label>
+                                <input type="time" id="actEndTime" required class="w-full border border-slate-300 rounded-md p-2 focus:ring-primary focus:border-primary">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Nama Pembimbing / Instruktur <span class="text-red-500">*</span></label>
+                                <input type="text" id="actInstructor" required placeholder="Contoh: Ust. Budi / Instruktur BLK" class="w-full border border-slate-300 rounded-md p-2 focus:ring-primary focus:border-primary">
+                            </div>
+                        </div>
+                        <div class="flex justify-end pt-4 border-t border-slate-200 mt-2">
+                            <button type="submit" class="px-6 py-2 bg-primary text-white rounded-md hover:bg-blue-700 shadow-sm font-medium"><i class="fas fa-save mr-2"></i>Simpan Kegiatan</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-sm border border-slate-200 flex-grow flex flex-col overflow-hidden">
+                    <div class="bg-slate-50 border-b border-slate-200 px-6 py-4">
+                        <h2 class="text-lg font-semibold text-slate-800"><i class="fas fa-list-ul text-primary mr-2"></i>Daftar Master Kegiatan</h2>
+                    </div>
+                    <div class="overflow-x-auto flex-grow custom-scrollbar">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50 sticky top-0">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama & Kategori</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Target Kasus</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Jadwal Hari & Jam</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pembimbing</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="activitiesTableBody" class="bg-white divide-y divide-gray-200">
+                                <!-- Data populated via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Event Details Modal -->
+    <div id="eventModal" class="modal fixed inset-0 bg-black bg-opacity-50 z-50 items-center justify-center">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4 transform transition-all">
+            <div class="border-b px-6 py-4 flex justify-between items-center">
+                <h3 class="text-lg font-medium text-slate-900" id="modalEventTitle">Detail Kegiatan</h3>
+                <button onclick="closeModal()" class="text-slate-400 hover:text-slate-500">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="px-6 py-4">
+                <div class="mb-4 flex flex-wrap gap-4 bg-slate-50 p-3 rounded-md border border-slate-100">
+                    <div class="flex-1 min-w-[120px]">
+                        <p class="text-xs text-slate-500 uppercase font-semibold tracking-wider mb-1"><i class="far fa-clock mr-1"></i> Waktu Pelaksanaan</p>
+                        <p class="font-medium text-sm text-slate-800" id="modalEventDate"></p>
+                        <p class="text-primary font-bold text-sm" id="modalEventTime"></p>
+                    </div>
+                    <div class="flex-1 min-w-[120px]">
+                        <p class="text-xs text-slate-500 uppercase font-semibold tracking-wider mb-1"><i class="fas fa-user-tie mr-1"></i> Pembimbing</p>
+                        <p class="font-medium text-sm text-slate-800" id="modalEventInstructor"></p>
+                    </div>
+                </div>
+                <div class="mb-4">
+                    <p class="text-sm text-slate-500 mb-1"><i class="fas fa-layer-group mr-1"></i> Jenis Program</p>
+                    <span id="modalEventType" class="inline-block px-2 py-1 text-xs rounded-full bg-slate-100 text-slate-800"></span>
+                </div>
+                <div>
+                    <p class="text-sm text-slate-500 mb-2"><i class="fas fa-users mr-1"></i> Daftar Peserta (WBP)</p>
+                    <ul id="modalParticipantList" class="bg-slate-50 rounded-md border border-slate-200 p-2 max-h-40 overflow-y-auto text-sm space-y-1">
+                        <!-- Participants populated via JS -->
+                    </ul>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-6 py-3 flex justify-end rounded-b-lg border-t">
+                <button onclick="closeModal()" class="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded shadow-sm hover:bg-gray-50 text-sm font-medium">Tutup</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- State Management ---
+        let inmates = []; 
+        let schedules = []; 
+        let activitiesList = []; // Master list untuk jadwal kegiatan kustom
+        
+        let currentMonth = new Date().getMonth();
+        let currentYear = new Date().getFullYear();
+
+        const typeColors = {
+            'Kepribadian': 'bg-green-100 text-green-800',
+            'Kemandirian': 'bg-blue-100 text-blue-800',
+            'Rehabilitasi': 'bg-purple-100 text-purple-800'
+        };
+
+        // --- Initialization ---
+        window.onload = () => {
+            generateRegNumber();
+            document.getElementById('activityStartDate').valueAsDate = new Date(); 
+            initMasterActivities();
+            loadMockData(); 
+        };
+
+        function initMasterActivities() {
+            // Data inisial (sebagai contoh default jika belum ada yang diinput)
+            activitiesList = [
+                { id: 'act-1', name: 'Rehabilitasi Medis (Detoks)', type: 'Rehabilitasi', targetCase: 'Narkotika', days: [1, 3, 5], startTime: '08:00', endTime: '10:00', instructor: 'Dr. Hendra & Tim BNN' },
+                { id: 'act-2', name: 'Bimbingan Kerja (Bengkel Las)', type: 'Kemandirian', targetCase: 'Pencurian', days: [1, 2, 3, 4], startTime: '13:00', endTime: '15:00', instructor: 'Instruktur BLK Kab. Lebak' },
+                { id: 'act-3', name: 'Bimbingan Kerohanian Umum', type: 'Kepribadian', targetCase: 'Semua', days: [2, 5], startTime: '09:00', endTime: '11:00', instructor: 'Ust. Fulan / Pdt. Markus' },
+                { id: 'act-4', name: 'Konseling Psikologi / Anger Mgt', type: 'Rehabilitasi', targetCase: 'Kekerasan', days: [2, 4], startTime: '10:00', endTime: '12:00', instructor: 'Psikolog Bapas Rangkas' },
+                { id: 'act-5', name: 'Penyuluhan Kesadaran Hukum', type: 'Kepribadian', targetCase: 'Semua', days: [1], startTime: '08:30', endTime: '10:30', instructor: 'Petugas Binadik' }
+            ];
+        }
+
+        // --- UI Navigation ---
+        function switchTab(tabId) {
+            // Hide all sections
+            document.querySelectorAll('.section-content').forEach(el => el.classList.add('hidden'));
+            // Reset tab styles
+            ['input', 'list', 'calendar', 'activities'].forEach(id => {
+                const btn = document.getElementById(`tab-btn-${id}`);
+                if (btn) {
+                    btn.classList.remove('border-l-4', 'border-primary', 'text-primary', 'bg-slate-50', 'md:border-b-0', 'border-b-2');
+                    btn.classList.add('border-transparent', 'text-slate-600', 'md:border-b-0');
+                    
+                    if(window.innerWidth < 768) {
+                        if(tabId === id) btn.classList.add('border-b-2', 'border-primary');
+                    }
+                }
+            });
+
+            // Show selected section
+            const section = document.getElementById(`section-${tabId}`);
+            if(section) section.classList.remove('hidden');
+            
+            // Highlight selected tab
+            const activeBtn = document.getElementById(`tab-btn-${tabId}`);
+            if(activeBtn) {
+                activeBtn.classList.remove('border-transparent', 'text-slate-600');
+                if(window.innerWidth >= 768) {
+                    activeBtn.classList.add('border-l-4', 'border-primary', 'text-primary', 'bg-slate-50');
+                } else {
+                     activeBtn.classList.add('border-b-2', 'border-primary', 'text-primary');
+                }
+            }
+
+            // Specific actions based on tab
+            if (tabId === 'calendar') renderCalendar();
+            else if (tabId === 'list') renderInmateTable();
+            else if (tabId === 'activities') renderActivitiesTable();
+        }
+
+        // --- Helper Functions ---
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-message').innerText = message;
+            toast.classList.remove('translate-y-[-150%]');
+            setTimeout(() => {
+                toast.classList.add('translate-y-[-150%]');
+            }, 3000);
+        }
+
+        function generateRegNumber() {
+            const dateStr = new Date().toISOString().slice(2, 10).replace(/-/g, '');
+            const randomNum = Math.floor(1000 + Math.random() * 9000);
+            document.getElementById('regNumber').value = `WBP-${dateStr}-${randomNum}`;
+        }
+
+        function formatDate(dateString) {
+            const options = { year: 'numeric', month: 'long', day: 'numeric' };
+            return new Date(dateString).toLocaleDateString('id-ID', options);
+        }
+
+        // --- STREAMING_CHUNK:Master Kegiatan Logic ---
+        function getDayName(dayIndex) {
+            const names = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+            return names[dayIndex];
+        }
+
+        function renderActivitiesTable() {
+            const tbody = document.getElementById('activitiesTableBody');
+            tbody.innerHTML = '';
+            
+            if (activitiesList.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-4 text-center text-sm text-gray-500">Belum ada master kegiatan yang didaftarkan.</td></tr>';
+                return;
+            }
+
+            activitiesList.forEach(act => {
+                const daysStr = act.days.map(d => getDayName(d).substring(0,3)).join(', ');
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="px-6 py-4">
+                        <div class="text-sm font-bold text-gray-900">${act.name}</div>
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full mt-1 ${typeColors[act.type]}">${act.type}</span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-medium">${act.targetCase === 'Semua' ? 'Umum (Semua Kasus)' : act.targetCase}</td>
+                    <td class="px-6 py-4 text-sm text-gray-500">
+                        <div class="font-medium text-slate-700"><i class="far fa-calendar-alt mr-1"></i> ${daysStr}</div>
+                        <div class="text-xs text-primary font-bold mt-1"><i class="far fa-clock mr-1"></i> ${act.startTime} - ${act.endTime} WIB</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700"><i class="fas fa-user-tie text-slate-400 mr-1"></i> ${act.instructor}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                         <button onclick="deleteActivity('${act.id}')" class="text-red-500 hover:text-red-700 bg-red-50 p-2 rounded-full" title="Hapus"><i class="fas fa-trash"></i></button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        document.getElementById('activityForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const checkedDays = Array.from(document.querySelectorAll('input[name="actDays"]:checked')).map(cb => parseInt(cb.value));
+            
+            if (checkedDays.length === 0) {
+                alert("Harap pilih minimal 1 hari pelaksanaan kegiatan untuk rutinitas (frekuensi mingguan).");
+                return;
+            }
+
+            const newAct = {
+                id: 'act-' + Date.now(),
+                name: document.getElementById('actName').value,
+                type: document.getElementById('actType').value,
+                targetCase: document.getElementById('actTarget').value,
+                days: checkedDays,
+                startTime: document.getElementById('actStartTime').value,
+                endTime: document.getElementById('actEndTime').value,
+                instructor: document.getElementById('actInstructor').value
+            };
+
+            activitiesList.push(newAct);
+            renderActivitiesTable();
+            showToast("Jadwal Kegiatan Pembinaan berhasil ditambahkan!");
+            this.reset();
+        });
+
+        function deleteActivity(id) {
+            if(confirm("Apakah Anda yakin ingin menghapus jadwal kegiatan ini? Jadwal yang sudah terdaftar pada WBP mungkin akan terpengaruh.")) {
+                activitiesList = activitiesList.filter(a => a.id !== id);
+                renderActivitiesTable();
+                showToast("Jadwal Kegiatan berhasil dihapus.");
+            }
+        }
+
+        // --- STREAMING_CHUNK:Handling Input and Suggestions ---
+        function suggestActivities() {
+            const caseType = document.getElementById('caseType').value;
+            const suggestionBox = document.getElementById('activitySuggestionBox');
+            const listContainer = document.getElementById('suggestedActivitiesList');
+            const displayType = document.getElementById('displayCaseType');
+
+            if (!caseType) {
+                suggestionBox.classList.add('hidden');
+                return;
+            }
+
+            displayType.innerText = caseType === 'Semua' ? 'Semua Kasus (Umum)' : caseType;
+            listContainer.innerHTML = '';
+            
+            // Ambil dari Master Kegiatan List (Customizable)
+            let programs = activitiesList.filter(act => act.targetCase === caseType || act.targetCase === 'Semua');
+            
+            if (programs.length === 0) {
+                listContainer.innerHTML = `<div class="col-span-1 md:col-span-2 p-3 bg-yellow-50 text-yellow-700 rounded-md text-sm"><i class="fas fa-exclamation-triangle mr-2"></i>Belum ada jadwal yang cocok. Silakan tambahkan jadwal khusus terlebih dahulu di menu <b>Master Kegiatan</b>.</div>`;
+            }
+
+            programs.forEach(prog => {
+                const daysStr = prog.days.map(d => getDayName(d).substring(0,3)).join(', ');
+
+                const div = document.createElement('div');
+                div.className = 'flex items-start bg-white p-3 rounded-md border border-blue-200 shadow-sm hover:border-primary transition-colors';
+                div.innerHTML = `
+                    <div class="flex items-center h-5 mt-1">
+                        <input type="checkbox" id="chk-${prog.id}" value='${JSON.stringify(prog)}' class="activity-checkbox focus:ring-primary h-4 w-4 text-primary border-gray-300 rounded" checked>
+                    </div>
+                    <div class="ml-3 text-sm flex-grow">
+                        <label for="chk-${prog.id}" class="font-bold text-slate-800 cursor-pointer block">${prog.name}</label>
+                        <div class="mt-1 flex flex-col gap-1">
+                            <span class="text-xs text-slate-600 bg-slate-100 inline-block px-1.5 py-0.5 rounded w-max"><i class="far fa-calendar-alt text-slate-400"></i> ${daysStr} (${prog.startTime}-${prog.endTime})</span>
+                            <span class="text-xs text-primary font-medium mt-0.5"><i class="fas fa-user-tie"></i> Pembimbing: ${prog.instructor}</span>
+                        </div>
+                    </div>
+                `;
+                listContainer.appendChild(div);
+            });
+
+            suggestionBox.classList.remove('hidden');
+        }
+
+        // --- Handling Form Submission ---
+        document.getElementById('inmateForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const regNum = document.getElementById('regNumber').value;
+            const name = document.getElementById('fullName').value;
+            const caseType = document.getElementById('caseType').value;
+            const startDateStr = document.getElementById('activityStartDate').value;
+            
+            if(!startDateStr) {
+                alert("Mohon pilih tanggal mulai kegiatan.");
+                return;
+            }
+
+            // Gather selected activities
+            const selectedActivities = [];
+            document.querySelectorAll('.activity-checkbox:checked').forEach(cb => {
+                selectedActivities.push(JSON.parse(cb.value));
+            });
+
+            const newInmate = {
+                id: regNum,
+                name: name,
+                birthPlace: document.getElementById('birthPlace').value,
+                birthDate: document.getElementById('birthDate').value,
+                gender: document.getElementById('gender').value,
+                religion: document.getElementById('religion').value,
+                caseType: caseType,
+                activities: selectedActivities.map(a => a.name)
+            };
+
+            inmates.push(newInmate);
+
+            // Schedule the activities
+            generateSchedulesForInmate(newInmate, selectedActivities, new Date(startDateStr));
+
+            showToast(`Data ${name} berhasil disimpan dan dijadwalkan!`);
+            this.reset();
+            document.getElementById('activitySuggestionBox').classList.add('hidden');
+            generateRegNumber();
+            
+            // Automatically switch to list view after save
+            setTimeout(() => switchTab('list'), 1000);
+        });
+
+        // --- STREAMING_CHUNK:Scheduling Logic ---
+        function generateSchedulesForInmate(inmate, programs, startDate) {
+            // Generate schedule for the next 4 weeks (simplified logic)
+            const weeksToSchedule = 4;
+            const endDate = new Date(startDate);
+            endDate.setDate(endDate.getDate() + (weeksToSchedule * 7));
+
+            programs.forEach(prog => {
+                let currentDate = new Date(startDate);
+                
+                while (currentDate <= endDate) {
+                    // Check if current date's day of week matches the program's schedule
+                    if (prog.days.includes(currentDate.getDay())) {
+                        const dateKey = currentDate.toISOString().split('T')[0];
+                        
+                        // Check if an event of this type already exists on this date
+                        let existingEvent = schedules.find(s => s.date === dateKey && s.programId === prog.id);
+                        
+                        if (existingEvent) {
+                            existingEvent.participants.push({ id: inmate.id, name: inmate.name });
+                        } else {
+                            schedules.push({
+                                id: `evt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                                date: dateKey,
+                                programId: prog.id,
+                                title: prog.name,
+                                type: prog.type,
+                                color: typeColors[prog.type] || 'bg-slate-100 text-slate-800',
+                                time: `${prog.startTime} - ${prog.endTime} WIB`,
+                                instructor: prog.instructor,
+                                participants: [{ id: inmate.id, name: inmate.name }]
+                            });
+                        }
+                    }
+                    // Move to next day
+                    currentDate.setDate(currentDate.getDate() + 1);
+                }
+            });
+        }
+
+        // --- STREAMING_CHUNK:Rendering Inmate List ---
+        function renderInmateTable(searchTerm = "") {
+            const tbody = document.getElementById('inmateTableBody');
+            const emptyState = document.getElementById('emptyListState');
+            tbody.innerHTML = '';
+            
+            const filtered = inmates.filter(inv => 
+                inv.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                inv.id.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+
+            if (filtered.length === 0) {
+                emptyState.classList.remove('hidden');
+                tbody.parentElement.classList.add('hidden');
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+            tbody.parentElement.classList.remove('hidden');
+
+            filtered.forEach(inmate => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${inmate.id}</td>
+                    <td class="px-6 py-4">
+                        <div class="text-sm font-bold text-gray-900">${inmate.name}</div>
+                        <div class="text-xs text-gray-500">${inmate.gender}, ${inmate.religion}</div>
+                        <div class="text-xs text-gray-400">${inmate.birthPlace}, ${formatDate(inmate.birthDate)}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                            ${inmate.caseType}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-500">
+                        <ul class="list-disc pl-4">
+                            ${inmate.activities.map(act => `<li>${act}</li>`).join('')}
+                        </ul>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                         <!-- Placeholder for future actions like Edit/Delete -->
+                         <button class="text-indigo-600 hover:text-indigo-900 mx-1" title="Edit"><i class="fas fa-edit"></i></button>
+                         <button class="text-red-600 hover:text-red-900 mx-1" title="Hapus"><i class="fas fa-trash"></i></button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function filterInmates() {
+            const term = document.getElementById('searchInput').value;
+            renderInmateTable(term);
+        }
+
+        // --- STREAMING_CHUNK:Rendering Calendar System ---
+        function changeMonth(delta) {
+            currentMonth += delta;
+            if (currentMonth > 11) {
+                currentMonth = 0;
+                currentYear++;
+            } else if (currentMonth < 0) {
+                currentMonth = 11;
+                currentYear--;
+            }
+            renderCalendar();
+        }
+
+        function renderCalendar() {
+            const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+            document.getElementById('currentMonthYear').innerText = `${monthNames[currentMonth]} ${currentYear}`;
+
+            const grid = document.querySelector('.calendar-grid');
+            // Remove old days
+            const dayCells = grid.querySelectorAll('.calendar-day');
+            dayCells.forEach(cell => cell.remove());
+
+            const firstDay = new Date(currentYear, currentMonth, 1).getDay(); // 0 (Sun) to 6 (Sat)
+            const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+            
+            const today = new Date();
+            const isCurrentMonthYear = today.getMonth() === currentMonth && today.getFullYear() === currentYear;
+
+            // Fill empty cells before 1st of month
+            for (let i = 0; i < firstDay; i++) {
+                const emptyCell = document.createElement('div');
+                emptyCell.className = 'calendar-day empty';
+                grid.appendChild(emptyCell);
+            }
+
+            // Fill days
+            for (let day = 1; day <= daysInMonth; day++) {
+                const cellDate = new Date(currentYear, currentMonth, day);
+                const dateKey = cellDate.toISOString().split('T')[0];
+                
+                const cell = document.createElement('div');
+                cell.className = `calendar-day ${isCurrentMonthYear && day === today.getDate() ? 'today' : ''}`;
+                
+                cell.innerHTML = `<span class="date-number">${day}</span>`;
+                
+                // Find events for this day
+                const dayEvents = schedules.filter(s => s.date === dateKey);
+                
+                const eventContainer = document.createElement('div');
+                eventContainer.className = 'mt-1 flex flex-col gap-1 max-h-[70px] overflow-y-auto custom-scrollbar';
+                
+                dayEvents.forEach(evt => {
+                    const badge = document.createElement('div');
+                    badge.className = `event-badge ${evt.color}`;
+                    badge.innerText = evt.title;
+                    badge.title = `${evt.title} (${evt.participants.length} Orang)`;
+                    badge.onclick = () => openModal(evt);
+                    eventContainer.appendChild(badge);
+                });
+
+                cell.appendChild(eventContainer);
+                grid.appendChild(cell);
+            }
+            
+            // Fill remaining empty cells at end of month to complete grid (optional, for aesthetics)
+            const totalCells = firstDay + daysInMonth;
+            const remainingCells = (7 - (totalCells % 7)) % 7;
+            for(let i=0; i<remainingCells; i++) {
+                 const emptyCell = document.createElement('div');
+                emptyCell.className = 'calendar-day empty';
+                grid.appendChild(emptyCell);
+            }
+        }
+
+        // --- STREAMING_CHUNK:Modal and Mock Data ---
+        function openModal(event) {
+            document.getElementById('modalEventTitle').innerText = event.title;
+            document.getElementById('modalEventDate').innerText = formatDate(event.date);
+            document.getElementById('modalEventTime').innerText = event.time || 'Waktu belum diset';
+            document.getElementById('modalEventInstructor').innerText = event.instructor || 'Belum ada pembimbing';
+            
+            const typeBadge = document.getElementById('modalEventType');
+            typeBadge.innerText = event.type;
+            
+            // Reset colors based on type
+            typeBadge.className = `inline-block px-2 py-1 text-xs font-semibold rounded-full ${typeColors[event.type] || 'bg-slate-100 text-slate-800'}`;
+
+            const list = document.getElementById('modalParticipantList');
+            list.innerHTML = '';
+            
+            if(event.participants.length === 0) {
+                 list.innerHTML = '<li class="text-slate-400 italic py-1">Belum ada peserta terdaftar.</li>';
+            } else {
+                event.participants.forEach((p, index) => {
+                    const li = document.createElement('li');
+                    li.className = 'py-1 border-b border-slate-100 last:border-0 flex justify-between';
+                    li.innerHTML = `<span>${index + 1}. ${p.name}</span> <span class="text-xs text-slate-400">${p.id}</span>`;
+                    list.appendChild(li);
+                });
+            }
+
+            document.getElementById('eventModal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('eventModal').classList.remove('active');
+        }
+        
+        // Close modal on outside click
+        document.getElementById('eventModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeModal();
+            }
+        });
+
+        // Load some initial data for demonstration purposes
+        function loadMockData() {
+            // Get dates for this week
+            const today = new Date();
+            const currentWeekMonday = new Date(today.setDate(today.getDate() - today.getDay() + 1));
+            
+            const mockInmate1 = {
+                id: "WBP-20240501-1234",
+                name: "Budi Santoso",
+                birthPlace: "Jakarta",
+                birthDate: "1990-05-15",
+                gender: "Laki-laki",
+                religion: "Islam",
+                caseType: "Pencurian",
+                activities: ["Bimbingan Kerja (Bengkel Las)", "Pembinaan Mental & Etika"]
+            };
+            
+            const mockInmate2 = {
+                id: "WBP-20240410-5678",
+                name: "Anton Wijaya",
+                birthPlace: "Surabaya",
+                birthDate: "1985-11-20",
+                gender: "Laki-laki",
+                religion: "Kristen Protestan",
+                caseType: "Narkotika",
+                activities: ["Rehabilitasi Medis (Detoks)", "Bimbingan Kerohanian Umum"]
+            };
+
+            inmates.push(mockInmate1, mockInmate2);
+            
+            // Mock schedule generation based on mock inmates and Master Activities
+            const pencurianProgs = activitiesList.filter(a => a.targetCase === 'Pencurian' || a.targetCase === 'Semua');
+            const narkotikaProgs = activitiesList.filter(a => a.targetCase === 'Narkotika' || a.targetCase === 'Semua');
+            
+            generateSchedulesForInmate(mockInmate1, pencurianProgs, currentWeekMonday);
+            generateSchedulesForInmate(mockInmate2, narkotikaProgs, currentWeekMonday);
+        }
+
+    </script>
+</body>
+</html>
