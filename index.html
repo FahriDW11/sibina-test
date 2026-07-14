@@ -338,9 +338,18 @@
                                     <option value="Lainnya">Lainnya</option>
                                 </select>
                             </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Frekuensi <span class="text-red-500">*</span></label>
+                                <select id="actFrequency" required onchange="toggleScheduleOptions()" class="w-full border border-slate-300 rounded-md p-2 focus:ring-primary focus:border-primary">
+                                    <option value="mingguan">Mingguan (Rutin Hari Tertentu)</option>
+                                    <option value="bulanan">Bulanan (Rutin Tanggal Tertentu)</option>
+                                </select>
+                            </div>
                             <div class="lg:col-span-3">
-                                <label class="block text-sm font-medium text-slate-700 mb-2">Jadwal Hari (Ceklis hari untuk frekuensi mingguan) <span class="text-red-500">*</span></label>
-                                <div class="flex flex-wrap gap-4 bg-slate-50 p-3 rounded-md border border-slate-200">
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Jadwal Pelaksanaan <span class="text-red-500">*</span></label>
+                                
+                                <!-- Opsi Mingguan -->
+                                <div id="weeklyScheduleOptions" class="flex flex-wrap gap-4 bg-slate-50 p-3 rounded-md border border-slate-200">
                                     <label class="inline-flex items-center cursor-pointer"><input type="checkbox" name="actDays" value="1" class="rounded text-primary focus:ring-primary h-4 w-4"> <span class="ml-2 text-sm">Senin</span></label>
                                     <label class="inline-flex items-center cursor-pointer"><input type="checkbox" name="actDays" value="2" class="rounded text-primary focus:ring-primary h-4 w-4"> <span class="ml-2 text-sm">Selasa</span></label>
                                     <label class="inline-flex items-center cursor-pointer"><input type="checkbox" name="actDays" value="3" class="rounded text-primary focus:ring-primary h-4 w-4"> <span class="ml-2 text-sm">Rabu</span></label>
@@ -348,6 +357,14 @@
                                     <label class="inline-flex items-center cursor-pointer"><input type="checkbox" name="actDays" value="5" class="rounded text-primary focus:ring-primary h-4 w-4"> <span class="ml-2 text-sm">Jumat</span></label>
                                     <label class="inline-flex items-center cursor-pointer"><input type="checkbox" name="actDays" value="6" class="rounded text-primary focus:ring-primary h-4 w-4"> <span class="ml-2 text-sm">Sabtu</span></label>
                                     <label class="inline-flex items-center cursor-pointer"><input type="checkbox" name="actDays" value="0" class="rounded text-primary focus:ring-primary h-4 w-4"> <span class="ml-2 text-sm text-red-600">Minggu</span></label>
+                                </div>
+
+                                <!-- Opsi Bulanan -->
+                                <div id="monthlyScheduleOptions" class="hidden bg-slate-50 p-3 rounded-md border border-slate-200">
+                                    <p class="text-xs text-slate-500 mb-2">Ceklis tanggal untuk pelaksanaan setiap bulannya (1-31):</p>
+                                    <div class="grid grid-cols-7 sm:grid-cols-10 md:grid-cols-11 gap-2" id="dateCheckboxesContainer">
+                                        <!-- Di-generate otomatis via JS -->
+                                    </div>
                                 </div>
                             </div>
                             <div>
@@ -452,18 +469,45 @@
         window.onload = () => {
             generateRegNumber();
             document.getElementById('activityStartDate').valueAsDate = new Date(); 
+            generateDateCheckboxes();
             initMasterActivities();
             loadMockData(); 
         };
 
+        function generateDateCheckboxes() {
+            const container = document.getElementById('dateCheckboxesContainer');
+            if(!container) return;
+            for(let i=1; i<=31; i++) {
+                container.innerHTML += `
+                    <label class="relative inline-flex items-center justify-center cursor-pointer">
+                        <input type="checkbox" name="actDates" value="${i}" class="peer sr-only"> 
+                        <div class="w-full bg-white border border-slate-200 px-2 py-1.5 rounded text-sm text-center font-medium text-slate-700 hover:border-primary peer-checked:bg-primary peer-checked:text-white peer-checked:border-primary transition-all duration-200 shadow-sm">
+                            ${i}
+                        </div>
+                    </label>
+                `;
+            }
+        }
+        
+        function toggleScheduleOptions() {
+            const freq = document.getElementById('actFrequency').value;
+            if(freq === 'mingguan') {
+                document.getElementById('weeklyScheduleOptions').classList.remove('hidden');
+                document.getElementById('monthlyScheduleOptions').classList.add('hidden');
+            } else {
+                document.getElementById('weeklyScheduleOptions').classList.add('hidden');
+                document.getElementById('monthlyScheduleOptions').classList.remove('hidden');
+            }
+        }
+
         function initMasterActivities() {
             // Data inisial (sebagai contoh default jika belum ada yang diinput)
             activitiesList = [
-                { id: 'act-1', name: 'Rehabilitasi Medis (Detoks)', type: 'Rehabilitasi', targetCase: 'Narkotika', days: [1, 3, 5], startTime: '08:00', endTime: '10:00', instructor: 'Dr. Hendra & Tim BNN' },
-                { id: 'act-2', name: 'Bimbingan Kerja (Bengkel Las)', type: 'Kemandirian', targetCase: 'Pencurian', days: [1, 2, 3, 4], startTime: '13:00', endTime: '15:00', instructor: 'Instruktur BLK Kab. Lebak' },
-                { id: 'act-3', name: 'Bimbingan Kerohanian Umum', type: 'Kepribadian', targetCase: 'Semua', days: [2, 5], startTime: '09:00', endTime: '11:00', instructor: 'Ust. Fulan / Pdt. Markus' },
-                { id: 'act-4', name: 'Konseling Psikologi / Anger Mgt', type: 'Rehabilitasi', targetCase: 'Kekerasan', days: [2, 4], startTime: '10:00', endTime: '12:00', instructor: 'Psikolog Bapas Rangkas' },
-                { id: 'act-5', name: 'Penyuluhan Kesadaran Hukum', type: 'Kepribadian', targetCase: 'Semua', days: [1], startTime: '08:30', endTime: '10:30', instructor: 'Petugas Binadik' }
+                { id: 'act-1', name: 'Rehabilitasi Medis (Detoks)', type: 'Rehabilitasi', targetCase: 'Narkotika', frequency: 'mingguan', days: [1, 3, 5], dates: [], startTime: '08:00', endTime: '10:00', instructor: 'Dr. Hendra & Tim BNN' },
+                { id: 'act-2', name: 'Bimbingan Kerja (Bengkel Las)', type: 'Kemandirian', targetCase: 'Pencurian', frequency: 'mingguan', days: [1, 2, 3, 4], dates: [], startTime: '13:00', endTime: '15:00', instructor: 'Instruktur BLK Kab. Lebak' },
+                { id: 'act-3', name: 'Bimbingan Kerohanian Umum', type: 'Kepribadian', targetCase: 'Semua', frequency: 'mingguan', days: [2, 5], dates: [], startTime: '09:00', endTime: '11:00', instructor: 'Ust. Fulan / Pdt. Markus' },
+                { id: 'act-4', name: 'Konseling Psikologi / Anger Mgt', type: 'Rehabilitasi', targetCase: 'Kekerasan', frequency: 'mingguan', days: [2, 4], dates: [], startTime: '10:00', endTime: '12:00', instructor: 'Psikolog Bapas Rangkas' },
+                { id: 'act-5', name: 'Penyuluhan Kesadaran Hukum', type: 'Kepribadian', targetCase: 'Semua', frequency: 'bulanan', days: [], dates: [10, 25], startTime: '08:30', endTime: '10:30', instructor: 'Petugas Binadik' }
             ];
         }
 
@@ -542,16 +586,26 @@
             }
 
             activitiesList.forEach(act => {
-                const daysStr = act.days.map(d => getDayName(d).substring(0,3)).join(', ');
+                let scheduleStr = "";
+                if (act.frequency === 'bulanan') {
+                    scheduleStr = `<i class="far fa-calendar-alt mr-1"></i> Tgl: ${act.dates.join(', ')}`;
+                } else {
+                    const daysStr = (act.days || []).map(d => getDayName(d).substring(0,3)).join(', ');
+                    scheduleStr = `<i class="far fa-calendar-alt mr-1"></i> Hari: ${daysStr}`;
+                }
+
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td class="px-6 py-4">
                         <div class="text-sm font-bold text-gray-900">${act.name}</div>
-                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full mt-1 ${typeColors[act.type]}">${act.type}</span>
+                        <div class="flex items-center mt-1">
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${typeColors[act.type]}">${act.type}</span>
+                            <span class="ml-2 text-[10px] uppercase font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">${act.frequency || 'mingguan'}</span>
+                        </div>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-medium">${act.targetCase === 'Semua' ? 'Umum (Semua Kasus)' : act.targetCase}</td>
                     <td class="px-6 py-4 text-sm text-gray-500">
-                        <div class="font-medium text-slate-700"><i class="far fa-calendar-alt mr-1"></i> ${daysStr}</div>
+                        <div class="font-medium text-slate-700">${scheduleStr}</div>
                         <div class="text-xs text-primary font-bold mt-1"><i class="far fa-clock mr-1"></i> ${act.startTime} - ${act.endTime} WIB</div>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700"><i class="fas fa-user-tie text-slate-400 mr-1"></i> ${act.instructor}</td>
@@ -565,11 +619,23 @@
 
         document.getElementById('activityForm').addEventListener('submit', function(e) {
             e.preventDefault();
-            const checkedDays = Array.from(document.querySelectorAll('input[name="actDays"]:checked')).map(cb => parseInt(cb.value));
             
-            if (checkedDays.length === 0) {
-                alert("Harap pilih minimal 1 hari pelaksanaan kegiatan untuk rutinitas (frekuensi mingguan).");
-                return;
+            const freq = document.getElementById('actFrequency').value;
+            let checkedDays = [];
+            let checkedDates = [];
+
+            if (freq === 'mingguan') {
+                checkedDays = Array.from(document.querySelectorAll('input[name="actDays"]:checked')).map(cb => parseInt(cb.value));
+                if (checkedDays.length === 0) {
+                    alert("Harap pilih minimal 1 hari pelaksanaan untuk frekuensi mingguan.");
+                    return;
+                }
+            } else {
+                checkedDates = Array.from(document.querySelectorAll('input[name="actDates"]:checked')).map(cb => parseInt(cb.value));
+                if (checkedDates.length === 0) {
+                    alert("Harap pilih minimal 1 tanggal pelaksanaan untuk frekuensi bulanan.");
+                    return;
+                }
             }
 
             const newAct = {
@@ -577,7 +643,9 @@
                 name: document.getElementById('actName').value,
                 type: document.getElementById('actType').value,
                 targetCase: document.getElementById('actTarget').value,
+                frequency: freq,
                 days: checkedDays,
+                dates: checkedDates,
                 startTime: document.getElementById('actStartTime').value,
                 endTime: document.getElementById('actEndTime').value,
                 instructor: document.getElementById('actInstructor').value
@@ -587,6 +655,10 @@
             renderActivitiesTable();
             showToast("Jadwal Kegiatan Pembinaan berhasil ditambahkan!");
             this.reset();
+            
+            // Reset to default view
+            document.getElementById('weeklyScheduleOptions').classList.remove('hidden');
+            document.getElementById('monthlyScheduleOptions').classList.add('hidden');
         });
 
         function deleteActivity(id) {
@@ -620,7 +692,13 @@
             }
 
             programs.forEach(prog => {
-                const daysStr = prog.days.map(d => getDayName(d).substring(0,3)).join(', ');
+                let scheduleStr = "";
+                if (prog.frequency === 'bulanan') {
+                    scheduleStr = `<i class="far fa-calendar-alt text-slate-400"></i> Bulanan (Tgl: ${prog.dates.join(', ')})`;
+                } else {
+                    const daysStr = (prog.days || []).map(d => getDayName(d).substring(0,3)).join(', ');
+                    scheduleStr = `<i class="far fa-calendar-alt text-slate-400"></i> Mingguan (${daysStr})`;
+                }
 
                 const div = document.createElement('div');
                 div.className = 'flex items-start bg-white p-3 rounded-md border border-blue-200 shadow-sm hover:border-primary transition-colors';
@@ -631,7 +709,7 @@
                     <div class="ml-3 text-sm flex-grow">
                         <label for="chk-${prog.id}" class="font-bold text-slate-800 cursor-pointer block">${prog.name}</label>
                         <div class="mt-1 flex flex-col gap-1">
-                            <span class="text-xs text-slate-600 bg-slate-100 inline-block px-1.5 py-0.5 rounded w-max"><i class="far fa-calendar-alt text-slate-400"></i> ${daysStr} (${prog.startTime}-${prog.endTime})</span>
+                            <span class="text-xs text-slate-600 bg-slate-100 inline-block px-1.5 py-0.5 rounded w-max">${scheduleStr} (${prog.startTime}-${prog.endTime})</span>
                             <span class="text-xs text-primary font-medium mt-0.5"><i class="fas fa-user-tie"></i> Pembimbing: ${prog.instructor}</span>
                         </div>
                     </div>
@@ -689,8 +767,8 @@
 
         // --- STREAMING_CHUNK:Scheduling Logic ---
         function generateSchedulesForInmate(inmate, programs, startDate) {
-            // Generate schedule for the next 4 weeks (simplified logic)
-            const weeksToSchedule = 4;
+            // Generate schedule for the next 12 weeks (approx 3 months) so monthly schedules appear properly
+            const weeksToSchedule = 12; 
             const endDate = new Date(startDate);
             endDate.setDate(endDate.getDate() + (weeksToSchedule * 7));
 
@@ -698,15 +776,27 @@
                 let currentDate = new Date(startDate);
                 
                 while (currentDate <= endDate) {
-                    // Check if current date's day of week matches the program's schedule
-                    if (prog.days.includes(currentDate.getDay())) {
+                    let shouldSchedule = false;
+                    
+                    if (prog.frequency === 'bulanan') {
+                        // Cek apakah tanggal (1-31) hari ini cocok dengan jadwal bulanan
+                        shouldSchedule = prog.dates && prog.dates.includes(currentDate.getDate());
+                    } else {
+                        // Default / Mingguan: Cek apakah hari (Senin-Minggu) cocok
+                        shouldSchedule = prog.days && prog.days.includes(currentDate.getDay());
+                    }
+
+                    if (shouldSchedule) {
                         const dateKey = currentDate.toISOString().split('T')[0];
                         
-                        // Check if an event of this type already exists on this date
+                        // Cek apakah kegiatan ini sudah dijadwalkan di tanggal yang sama
                         let existingEvent = schedules.find(s => s.date === dateKey && s.programId === prog.id);
                         
                         if (existingEvent) {
-                            existingEvent.participants.push({ id: inmate.id, name: inmate.name });
+                            // Hindari duplikasi nama WBP jika di-submit ulang
+                            if(!existingEvent.participants.find(p => p.id === inmate.id)){
+                                existingEvent.participants.push({ id: inmate.id, name: inmate.name });
+                            }
                         } else {
                             schedules.push({
                                 id: `evt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -721,7 +811,7 @@
                             });
                         }
                     }
-                    // Move to next day
+                    // Maju ke hari berikutnya
                     currentDate.setDate(currentDate.getDate() + 1);
                 }
             });
